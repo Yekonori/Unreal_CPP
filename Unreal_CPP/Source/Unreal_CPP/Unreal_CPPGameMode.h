@@ -13,6 +13,8 @@ class AUnreal_CPPGameMode : public AGameModeBase
 
 public:
 	AUnreal_CPPGameMode();
+
+	void CreateNewThirdCharacter(AController* controller, FVector spawnVectorLocation, FRotator spawnRotator);
 };
 
 

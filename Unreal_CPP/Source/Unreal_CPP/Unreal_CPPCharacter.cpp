@@ -8,6 +8,10 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Engine.h"
+#include "EngineGlobals.h"
+
+#include "Unreal_CPPGameMode.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AUnreal_CPPCharacter
@@ -131,4 +135,22 @@ void AUnreal_CPPCharacter::MoveRight(float Value)
 		// add movement in that direction
 		AddMovementInput(Direction, Value);
 	}
+}
+
+void AUnreal_CPPCharacter::Destroyed()
+{
+	const FVector Location = GetActorLocation();
+	const FRotator Rotation = GetActorRotation();
+	AActor* FireEffect = GetWorld()->SpawnActor<AActor>(DeathFXToSpawn, Location, Rotation);
+
+	(*FireEffect).SetLifeSpan(_deathFXDelay);
+
+	FRotator rot(0, 0, 0);
+
+	AGameModeBase* GM = GetWorld()->GetAuthGameMode();
+	if (AUnreal_CPPGameMode* GameMode = Cast<AUnreal_CPPGameMode>(GM)) {
+		GameMode->CreateNewThirdCharacter(GetController(), spawnPosition, rot);
+	}
+
+	Super::Destroyed();
 }
