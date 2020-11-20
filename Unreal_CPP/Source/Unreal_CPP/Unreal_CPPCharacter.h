@@ -31,18 +31,49 @@ public:
 
 	virtual void Destroyed() override;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"), Category = "Animation")
+	bool isStrafing;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"), Category = "Animation")
+	bool isGoingRight;
+
+	UCharacterMovementComponent* movement = nullptr;
+
 private:
-	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = "true"))
+	/* Pick Up & Drop */
+	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = "PickUp")
+	float pickupDistance;
+
+	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = "PickUp")
+	bool isHoldingObject;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"), Category = "PickUp")
+	class UPhysicsHandleComponent* PhysicsHandle;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"), Category = "PickUp")
+	class USceneComponent* GrabLocation;
+
+	/* Respawn */
+	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = "Respawn")
 	float _deathFXDelay;
 
-	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = "Respawn")
 	TSubclassOf<AActor> DeathFXToSpawn;
 
-	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = "Respawn")
 	TSubclassOf<APawn> ThirdPersonCharacterToSpawn;
 
-	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = "Respawn")
 	FVector spawnPosition;
+
+	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = "Animation")
+	bool actualyCrouch;
+
+	UPROPERTY(EditAnywhere, meta = (AllowPrivateAccess = "true"), Category = "Menu")
+	bool isInPause = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (AllowPrivateAccess = "true"), Category = "Menu")
+	FTransform spawnPositionProjectile;
 
 protected:
 
@@ -72,6 +103,21 @@ protected:
 
 	/** Handler for when a touch input stops. */
 	void TouchStopped(ETouchIndex::Type FingerIndex, FVector Location);
+
+	virtual void Tick(float DeltaSeconds) override;
+
+	void TryToPickAndDrop();
+	void Pick();
+	void Drop();
+
+	void TryCrouch();
+
+	void StartStafe();
+	void EndStrafe();
+
+	void Pause();
+
+	void ShootPaintBall();
 
 protected:
 	// APawn interface

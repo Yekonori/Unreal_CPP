@@ -10,8 +10,10 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Engine.h"
 #include "EngineGlobals.h"
+#include "PaintBullet.h"
 
 #include "Unreal_CPPGameMode.h"
+#include "DrawDebugHelpers.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AUnreal_CPPCharacter
@@ -49,6 +51,11 @@ AUnreal_CPPCharacter::AUnreal_CPPCharacter()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named MyCharacter (to avoid direct content references in C++)
+
+	GrabLocation = CreateDefaultSubobject<USceneComponent>(TEXT("GrabLocation"));
+	PhysicsHandle = CreateDefaultSubobject<UPhysicsHandleComponent>(TEXT("PhysicsHandle"));
+
+	movement = GetCharacterMovement();
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -60,6 +67,17 @@ void AUnreal_CPPCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 	check(PlayerInputComponent);
 	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
+
+	PlayerInputComponent->BindAction("PickAndDrop", IE_Pressed, this, &AUnreal_CPPCharacter::TryToPickAndDrop);
+
+	PlayerInputComponent->BindAction("Crouch", IE_Pressed, this, &AUnreal_CPPCharacter::TryCrouch);
+
+	PlayerInputComponent->BindAction("Strafe", IE_Pressed, this, &AUnreal_CPPCharacter::StartStafe);
+	PlayerInputComponent->BindAction("Strafe", IE_Released, this, &AUnreal_CPPCharacter::EndStrafe);
+
+	PlayerInputComponent->BindAction("Pause", IE_Pressed, this, &AUnreal_CPPCharacter::Pause);
+
+	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AUnreal_CPPCharacter::ShootPaintBall);
 
 	PlayerInputComponent->BindAxis("MoveForward", this, &AUnreal_CPPCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AUnreal_CPPCharacter::MoveRight);
@@ -120,6 +138,8 @@ void AUnreal_CPPCharacter::MoveForward(float Value)
 		const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
 		AddMovementInput(Direction, Value);
 	}
+
+	float MoveForwardValue = Value;
 }
 
 void AUnreal_CPPCharacter::MoveRight(float Value)
@@ -153,4 +173,117 @@ void AUnreal_CPPCharacter::Destroyed()
 	}
 
 	Super::Destroyed();
+}
+
+void AUnreal_CPPCharacter::TryToPickAndDrop()
+{
+	UE_LOG(LogTemp, Warning, TEXT("TryToPickAndDrop"));
+
+	if (isHoldingObject)
+	{
+		Drop();
+	}
+	else
+	{
+		Pick();
+	}
+
+	
+}
+
+void AUnreal_CPPCharacter::Pick()
+{
+	FVector Loc;
+	FRotator Rot;
+	FHitResult Hit;
+
+	GetController()->GetPlayerViewPoint(Loc, Rot);
+
+	FVector Start = Loc;
+	FVector End = Start + (FollowCamera->GetComponentRotation().Vector() * pickupDistance + GetActorLocation());
+
+	FCollisionQueryParams TraceParams;
+
+	GetWorld()->LineTraceSingleByObjectType(Hit, Start, End, ECC_PhysicsBody, TraceParams);
+
+	if (Hit.GetActor())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Hit Success !"));
+
+		PhysicsHandle->GrabComponentAtLocation(Hit.Component.Get(), Hit.BoneName, Hit.Location);
+		isHoldingObject = true;
+	}
+
+	DrawDebugLine(GetWorld(), Start, End, FColor::Red, true);
+}
+
+void AUnreal_CPPCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	const FVector grabVector(200, 80, 0);
+	const FTransform grabLocation(grabVector);
+
+	GrabLocation->SetRelativeTransform(grabLocation);
+
+	PhysicsHandle->SetTargetLocation(GrabLocation->GetComponentLocation());
+}
+
+void AUnreal_CPPCharacter::Drop()
+{
+	PhysicsHandle->ReleaseComponent();
+	isHoldingObject = false;
+}
+
+void AUnreal_CPPCharacter::TryCrouch()
+{
+	if (actualyCrouch)
+	{
+		UnCrouch();
+		actualyCrouch = false;
+	}
+	else
+	{
+		Crouch();
+		actualyCrouch = true;
+	}
+}
+
+void AUnreal_CPPCharacter::StartStafe()
+{
+	isStrafing = true;
+	movement->bUseControllerDesiredRotation = true;
+	movement->bOrientRotationToMovement = false;
+	UE_LOG(LogTemp, Warning, TEXT("I am strafing"));
+}
+
+void AUnreal_CPPCharacter::EndStrafe()
+{
+	isStrafing = false;
+	movement->bOrientRotationToMovement = true;
+	UE_LOG(LogTemp, Warning, TEXT("I am not strafing"));
+}
+
+void AUnreal_CPPCharacter::Pause()
+{
+	if (isInPause)
+	{
+		isInPause = false;
+	}
+	else 
+	{
+		isInPause = true;
+	}
+}
+
+void AUnreal_CPPCharacter::ShootPaintBall()
+{
+	if (!isHoldingObject)
+	{
+		FActorSpawnParameters parameters;
+		FTransform tmpPos = GetActorTransform();
+		tmpPos.SetLocation(GetActorRotation().Vector() * 200.0f + GetActorLocation());
+
+		AActor* projectile = GetWorld()->SpawnActor<AActor>(APaintBullet::StaticClass(), tmpPos, parameters);
+	}
 }
