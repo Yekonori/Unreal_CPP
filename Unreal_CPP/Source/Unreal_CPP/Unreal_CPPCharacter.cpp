@@ -200,7 +200,7 @@ void AUnreal_CPPCharacter::Pick()
 	GetController()->GetPlayerViewPoint(Loc, Rot);
 
 	FVector Start = Loc;
-	FVector End = Start + (Rot.Vector() * pickupDistance + GetActorLocation());
+	FVector End = Start + (Rot.Vector() * pickupDistance);
 
 	FCollisionQueryParams TraceParams;
 
