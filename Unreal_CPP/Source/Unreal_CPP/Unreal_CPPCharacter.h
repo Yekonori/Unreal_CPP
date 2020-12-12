@@ -119,6 +119,11 @@ protected:
 
 	void ShootPaintBall();
 
+	void Save();
+	void Load();
+
+	virtual void BeginPlay() override;
+
 protected:
 	// APawn interface
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;

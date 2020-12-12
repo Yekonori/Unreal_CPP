@@ -14,6 +14,8 @@
 
 #include "Unreal_CPPGameMode.h"
 #include "DrawDebugHelpers.h"
+#include "SavePoint.h"
+#include "Kismet/GameplayStatics.h"
 
 //////////////////////////////////////////////////////////////////////////
 // AUnreal_CPPCharacter
@@ -78,6 +80,9 @@ void AUnreal_CPPCharacter::SetupPlayerInputComponent(class UInputComponent* Play
 	PlayerInputComponent->BindAction("Pause", IE_Pressed, this, &AUnreal_CPPCharacter::Pause);
 
 	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AUnreal_CPPCharacter::ShootPaintBall);
+
+	PlayerInputComponent->BindAction("Save", IE_Pressed, this, &AUnreal_CPPCharacter::Save);
+	PlayerInputComponent->BindAction("Load", IE_Pressed, this, &AUnreal_CPPCharacter::Load);
 
 	PlayerInputComponent->BindAxis("MoveForward", this, &AUnreal_CPPCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AUnreal_CPPCharacter::MoveRight);
@@ -159,17 +164,33 @@ void AUnreal_CPPCharacter::MoveRight(float Value)
 
 void AUnreal_CPPCharacter::Destroyed()
 {
-	const FVector Location = GetActorLocation();
-	const FRotator Rotation = GetActorRotation();
-	AActor* FireEffect = GetWorld()->SpawnActor<AActor>(DeathFXToSpawn, Location, Rotation);
+	if (Controller == nullptr)
+	{
+		return;
+	}
 
-	(*FireEffect).SetLifeSpan(_deathFXDelay);
+	if (!Controller->CastToPlayerController()->IsPaused())
+	{
+		const FVector Location = GetActorLocation();
+		const FRotator Rotation = GetActorRotation();
+		AActor* FireEffect = GetWorld()->SpawnActor<AActor>(DeathFXToSpawn, Location, Rotation);
 
-	FRotator rot(0, 0, 0);
+		(*FireEffect).SetLifeSpan(_deathFXDelay);
 
-	AGameModeBase* GM = GetWorld()->GetAuthGameMode();
-	if (AUnreal_CPPGameMode* GameMode = Cast<AUnreal_CPPGameMode>(GM)) {
-		GameMode->CreateNewThirdCharacter(GetController(), spawnPosition, rot);
+		FRotator rot(0, 0, 0);
+
+		AGameModeBase* GM = GetWorld()->GetAuthGameMode();
+		if (AUnreal_CPPGameMode* GameMode = Cast<AUnreal_CPPGameMode>(GM)) {
+
+			if (USavePoint* LoadedGame = Cast<USavePoint>(UGameplayStatics::LoadGameFromSlot("Test", 0)))
+			{
+				GameMode->CreateNewThirdCharacter(Controller, LoadedGame->PlayerTransform.GetLocation(), rot);
+			}
+			else
+			{
+				GameMode->CreateNewThirdCharacter(Controller, spawnPosition, rot);
+			}
+		}
 	}
 
 	Super::Destroyed();
@@ -286,4 +307,44 @@ void AUnreal_CPPCharacter::ShootPaintBall()
 
 		AActor* projectile = GetWorld()->SpawnActor<AActor>(APaintBullet::StaticClass(), tmpPos, parameters);
 	}
+}
+
+void AUnreal_CPPCharacter::Save() 
+{
+	if (!movement->IsFalling())
+	{
+		if (USavePoint* SaveGameInstance = Cast<USavePoint>(UGameplayStatics::CreateSaveGameObject(USavePoint::StaticClass())))
+		{
+			// Set data on the savegame object.
+			SaveGameInstance->PlayerTransform = GetActorTransform();
+
+			// Save the data immediately.
+			if (UGameplayStatics::SaveGameToSlot(SaveGameInstance, "Test", 0))
+			{
+				// Save succeeded.
+				UE_LOG(LogTemp, Warning, TEXT("DATA SAVED"));
+			}
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Can't save in air"));
+	}
+}
+
+void AUnreal_CPPCharacter::Load()
+{
+	if (USavePoint* LoadedGame = Cast<USavePoint>(UGameplayStatics::LoadGameFromSlot("Test", 0)))
+	{
+		// The operation was successful, so LoadedGame now contains the data we saved earlier.
+		SetActorTransform(LoadedGame->PlayerTransform);
+		UE_LOG(LogTemp, Warning, TEXT("DATA LOADED"));
+	}
+}
+
+void AUnreal_CPPCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	Load();
 }
